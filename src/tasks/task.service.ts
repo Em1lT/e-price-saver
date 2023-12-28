@@ -7,6 +7,6 @@ export class TasksService {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   handleCron() {
-    this.logger.debug('fetch shit');
+    this.logger.debug('fetch new price of the electricity');
   }
 }
