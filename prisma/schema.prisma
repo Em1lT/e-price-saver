@@ -11,6 +11,8 @@ generator client {
 }
 
 model Price {
-  id      Int      @id @default(autoincrement())
-  price Int
+  id      Int    @id @default(autoincrement())
+  price Float    @default(0.00)
+  from           DateTime
+  to             DateTime
 }
