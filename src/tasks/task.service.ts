@@ -9,7 +9,7 @@ export class TasksService {
   constructor(private prisma: PrismaService) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
-  async handleCron() {
+  async saveElectricityPrice() {
     this.logger.debug('fetch new price of the electricity');
     const URL = 'https://www.porssisahkoa.fi/';
     const pageHtml = await fetch(URL);
@@ -19,13 +19,11 @@ export class TasksService {
     const text = allChildren.map((_, item) => $(item).text()).get();
 
     const [from, to] = text[1].split(' - ').map((i) => i.trim());
+    const fromHour = +from.split(' ').at(1) as number;
 
     const priceObject = {
       price: +text[2].replace(',', '.'),
-      // change from to ISO-8601 DateTime
-      from: new Date(
-        new Date().setHours(+!from.split(' ').at(0) as number),
-      ).toISOString(),
+      from: new Date(new Date().setHours(fromHour)).toISOString(),
       to: new Date(new Date().setHours(+to)).toISOString(),
     };
 
@@ -34,15 +32,14 @@ export class TasksService {
         price: priceObject.price,
         AND: [
           {
-            to: { lte: priceObject.to },
-            from: { gte: priceObject.from },
+            to: { gte: new Date().toISOString() },
           },
         ],
       },
     });
 
     if (alreadySet) {
-      this.logger.log('Already set this price', priceObject);
+      this.logger.log('Already set this price', alreadySet);
       return;
     }
 
