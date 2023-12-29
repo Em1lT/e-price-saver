@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma.service';
 import cheerio from 'cheerio';
 
@@ -8,10 +8,10 @@ export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   constructor(private prisma: PrismaService) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron('1 0-23/1 * * *')
   async saveElectricityPrice() {
-    this.logger.debug('fetch new price of the electricity');
-    const URL = 'https://www.porssisahkoa.fi/';
+    this.logger.debug('Fetch new price of the electricity', new Date());
+    const URL = process.env.ELECTRICITY_PRICE_URL;
     const pageHtml = await fetch(URL);
     const $ = cheerio.load(await pageHtml.text());
     const $priceBanner = $('div > div > h1');
