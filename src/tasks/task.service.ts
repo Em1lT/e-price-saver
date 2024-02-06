@@ -2,13 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma.service';
 import cheerio from 'cheerio';
+import { TelegramService } from 'nestjs-telegram';
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly telegram: TelegramService,
+  ) {}
 
-  @Cron('1 0-23/1 * * *')
+  @Cron('* * * * *')
   async saveElectricityPrice() {
     this.logger.debug('Fetch new price of the electricity', new Date());
     const URL = process.env.ELECTRICITY_PRICE_URL;
@@ -40,6 +44,12 @@ export class TasksService {
 
     if (alreadySet) {
       this.logger.log('Already set this price', alreadySet);
+      await this.telegram
+        .sendMessage({
+          chat_id: process.env.TELEGRAM_CHAT_ID,
+          text: `Hinta nyt: ${alreadySet.price} €`,
+        })
+        .toPromise();
       return;
     }
 
@@ -47,6 +57,12 @@ export class TasksService {
     await this.prisma.price.create({
       data: priceObject,
     });
+    await this.telegram
+      .sendMessage({
+        chat_id: process.env.TELEGRAM_CHAT_ID,
+        text: `Hinta nyt: ${priceObject.price} €`,
+      })
+      .toPromise();
     return;
   }
 }
