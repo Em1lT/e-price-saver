@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import axios from 'axios';
 import cheerio from 'cheerio';
 import { TelegramService } from 'nestjs-telegram';
 
@@ -8,12 +9,13 @@ export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   constructor(private readonly telegram: TelegramService) {}
 
-  @Cron('1 7-21 * * *')
+  // @Cron('1 7-21 * * *')
+  @Cron('* * * * *')
   async saveElectricityPrice() {
     this.logger.debug('Fetch new price of the electricity', new Date());
     const URL = process.env.ELECTRICITY_PRICE_URL;
-    const pageHtml = await fetch(URL);
-    const $ = cheerio.load(await pageHtml.text());
+    const pageHtml = await axios.get(URL);
+    const $ = cheerio.load(await pageHtml.data);
     const $priceBanner = $('div > div > h1');
     const allChildren = $priceBanner.parent().children();
     const text = allChildren.map((_, item) => $(item).text()).get();
