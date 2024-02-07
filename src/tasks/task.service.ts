@@ -56,7 +56,7 @@ export class TasksService {
     await this.telegram
       .sendMessage({
         chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: `Hinta nyt: ${priceObject.price} €`,
+        text: `Hinta nyt: ${priceObject.price} Senttiä`,
       })
       .toPromise();
     return;
