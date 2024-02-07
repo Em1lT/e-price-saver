@@ -8,7 +8,7 @@ export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   constructor(private readonly telegram: TelegramService) {}
 
-  @Cron('* * * * *')
+  @Cron('1 7-21 * * *')
   async saveElectricityPrice() {
     this.logger.debug('Fetch new price of the electricity', new Date());
     const URL = process.env.ELECTRICITY_PRICE_URL;
