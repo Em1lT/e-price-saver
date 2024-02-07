@@ -1,16 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '../prisma.service';
 import cheerio from 'cheerio';
 import { TelegramService } from 'nestjs-telegram';
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
-  constructor(
-    private prisma: PrismaService,
-    private readonly telegram: TelegramService,
-  ) {}
+  constructor(private readonly telegram: TelegramService) {}
 
   @Cron('* * * * *')
   async saveElectricityPrice() {
@@ -31,32 +27,32 @@ export class TasksService {
       to: new Date(new Date().setHours(+to)).toISOString(),
     };
 
-    const alreadySet = await this.prisma.price.findFirst({
-      where: {
-        price: priceObject.price,
-        AND: [
-          {
-            to: { gte: new Date().toISOString() },
-          },
-        ],
-      },
-    });
+    // const alreadySet = await this.prisma.price.findFirst({
+    //   where: {
+    //     price: priceObject.price,
+    //     AND: [
+    //       {
+    //         to: { gte: new Date().toISOString() },
+    //       },
+    //     ],
+    //   },
+    // });
 
-    if (alreadySet) {
-      this.logger.log('Already set this price', alreadySet);
-      await this.telegram
-        .sendMessage({
-          chat_id: process.env.TELEGRAM_CHAT_ID,
-          text: `Hinta nyt: ${alreadySet.price} €`,
-        })
-        .toPromise();
-      return;
-    }
+    // if (alreadySet) {
+    //   this.logger.log('Already set this price', alreadySet);
+    //   await this.telegram
+    //     .sendMessage({
+    //       chat_id: process.env.TELEGRAM_CHAT_ID,
+    //       text: `Hinta nyt: ${alreadySet.price} €`,
+    //     })
+    //     .toPromise();
+    //   return;
+    // }
 
-    this.logger.log('Saving new price of the electricity', priceObject);
-    await this.prisma.price.create({
-      data: priceObject,
-    });
+    // this.logger.log('Saving new price of the electricity', priceObject);
+    // await this.prisma.price.create({
+    //   data: priceObject,
+    // });
     await this.telegram
       .sendMessage({
         chat_id: process.env.TELEGRAM_CHAT_ID,
