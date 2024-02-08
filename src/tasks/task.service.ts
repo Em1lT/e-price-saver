@@ -15,7 +15,6 @@ export class TasksService {
   constructor(private readonly telegram: TelegramService) {}
 
   @Cron('1 7-21 * * *')
-  // @Cron('* * * * *')
   async saveElectricityPrice() {
     this.logger.debug('Fetch new price of the electricity', new Date());
     const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=1`;
@@ -33,8 +32,6 @@ export class TasksService {
       from: dateTime.toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
       to: new Date(addHours(dateTime, 1)).toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
     };
-
-    console.log(priceObject);
 
     // const alreadySet = await this.prisma.price.findFirst({
     //   where: {
@@ -71,7 +68,7 @@ export class TasksService {
     return;
   }
 
-  @Cron('* * * * *')
+  @Cron('1 15 * * *')
   async getTomorrowEPrices() {
     this.logger.debug('Fetch new price of the electricity', new Date());
     const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=2`;
@@ -91,7 +88,6 @@ export class TasksService {
       };
     });
 
-    // check this!!!!
     const text = tomorrowPrices
       .map(
         (item: any) =>
@@ -112,15 +108,10 @@ Tomorrows info! ⚡
   lowest: ${lowest.price}
 ${text}
       `;
-    console.log(t1);
     await this.telegram
       .sendMessage({
         chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: `
-        Tomorrows info! ⚡
-        highest: ${highest}
-        lowest: ${lowest}
-        `,
+        text: t1,
       })
       .toPromise();
 
