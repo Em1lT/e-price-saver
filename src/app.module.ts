@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TasksService } from './tasks/task.service';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from 'nestjs-telegram';
+import { TelegramMessageService } from './telegram/telegram.service';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { TelegramModule } from 'nestjs-telegram';
     }),
   ],
   controllers: [],
-  providers: [TasksService],
+  providers: [TasksService, TelegramMessageService],
 })
 export class AppModule {}

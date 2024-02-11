@@ -1,94 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import axios from 'axios';
 import { format, addHours } from 'date-fns';
-import { TelegramService } from 'nestjs-telegram';
-
-interface PriceObject {
-  time: string;
-  value: number;
-}
+import {
+  ElectricityPrice,
+  ElectricityPriceDto,
+} from '../electricity/electricity.dto';
+import { ElectricityService } from '../electricity/electricity.service';
+import { TelegramMessageService } from '../telegram/telegram.service';
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
-  constructor(private readonly telegram: TelegramService) {}
+  constructor(
+    private readonly telegram: TelegramMessageService,
+    private readonly electricityService: ElectricityService,
+  ) {}
 
   @Cron('1 7-21 * * *')
   async saveElectricityPrice() {
-    this.logger.debug('Fetch new price of the electricity', new Date());
-    const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=1`;
-    const response = await axios.get(URL);
-    const data = response.data;
-    const currentHour = format(Date.now(), 'H');
-
-    const price = data.find(
-      (price: PriceObject) => format(price.time, 'H') === currentHour,
+    const priceObject = await this.electricityService.getElectricityPrice(
+      format(Date.now(), 'H'),
     );
-    const dateTime = new Date(price.time);
-
-    const priceObject = {
-      price: price.value,
-      from: dateTime.toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-      to: new Date(addHours(dateTime, 1)).toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-    };
-
-    // const alreadySet = await this.prisma.price.findFirst({
-    //   where: {
-    //     price: priceObject.price,
-    //     AND: [
-    //       {
-    //         to: { gte: new Date().toISOString() },
-    //       },
-    //     ],
-    //   },
-    // });
-
-    // if (alreadySet) {
-    //   this.logger.log('Already set this price', alreadySet);
-    //   await this.telegram
-    //     .sendMessage({
-    //       chat_id: process.env.TELEGRAM_CHAT_ID,
-    //       text: `Hinta nyt: ${alreadySet.price} €`,
-    //     })
-    //     .toPromise();
-    //   return;
-    // }
-
-    // this.logger.log('Saving new price of the electricity', priceObject);
-    // await this.prisma.price.create({
-    //   data: priceObject,
-    // });
-    await this.telegram
-      .sendMessage({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: `Hinta nyt: ${priceObject.price} Snt/kwh`,
-      })
-      .toPromise();
+    const formattedText = this.telegram.formatMessage('price', priceObject);
+    await this.telegram.sendMessage(formattedText);
     return;
   }
 
   @Cron('1 15 * * *')
   async getTomorrowEPrices() {
     this.logger.debug('Fetch new price of the electricity', new Date());
-    const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=2`;
-    const response = await axios.get(URL);
-    const data = response.data;
+    const tomorrowsPrices =
+      await this.electricityService.getElectricityPrices(2);
 
-    if (data.length < 5) {
-      this.logger.debug('Prices not yet updated', new Date());
-    }
-
-    const tomorrowPrices = data.map((item: PriceObject) => {
-      const dateTime = new Date(item.time);
-      return {
-        price: item.value,
-        from: dateTime.toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-        to: new Date(addHours(dateTime, 1)).toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-      };
-    });
-
-    const text = tomorrowPrices
+    const text = tomorrowsPrices
       .map(
         (item: any) =>
           `Klo ${format(item.from, 'HH:mm')} - ${item.price} Snt/kwh \n`,
@@ -96,7 +40,7 @@ export class TasksService {
       .join(',')
       .replaceAll(',', '');
 
-    const sortedPrices = tomorrowPrices.sort((a, b) => {
+    const sortedPrices = tomorrowsPrices.sort((a, b) => {
       return a.price - b.price;
     });
     const lowest = sortedPrices.shift();
@@ -108,13 +52,7 @@ Tomorrows info! ⚡
   lowest: ${lowest.price}
 ${text}
       `;
-    await this.telegram
-      .sendMessage({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: t1,
-      })
-      .toPromise();
-
+    await this.telegram.sendMessage(t1);
     return;
   }
 }
