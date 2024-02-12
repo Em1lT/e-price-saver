@@ -1,12 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { format, addHours } from 'date-fns';
-import {
-  ElectricityPrice,
-  ElectricityPriceDto,
-} from '../electricity/electricity.dto';
+import { format } from 'date-fns';
+import { ElectricityPrice } from '../electricity/electricity.dto';
 import { ElectricityService } from '../electricity/electricity.service';
 import { TelegramMessageService } from '../telegram/telegram.service';
+import {
+  formatCurrentPriceTelegramMessasge,
+  formatTomorrowsPriceMessage,
+  formatTodaysPriceMessage,
+  concatArrayString,
+} from '../telegram/utils/helper';
 
 @Injectable()
 export class TasksService {
@@ -16,44 +19,64 @@ export class TasksService {
     private readonly electricityService: ElectricityService,
   ) {}
 
-  @Cron('1 7-21 * * *')
-  async saveElectricityPrice() {
+  // @Cron('1 7-21 * * *')
+  @Cron('* * * * *')
+  async getHourlyElectricityPrices() {
     const priceObject = await this.electricityService.getElectricityPrice(
       format(Date.now(), 'H'),
     );
-    const formattedText = this.telegram.formatMessage('price', priceObject);
-    await this.telegram.sendMessage(formattedText);
-    return;
+    if (priceObject.price < +process.env.PRICE_TOP) {
+      this.logger.log(
+        `Price is now ${priceObject.price} but not over the notification limit ${process.env.PRICE_TOP}`,
+      );
+      return;
+    }
+
+    const formattedText = formatCurrentPriceTelegramMessasge(priceObject);
+    return this.telegram.sendMessage(formattedText);
+  }
+
+  @Cron('1 6 * * *')
+  async getTodaysElectricityPrices() {
+    this.logger.log('Fetching todays electricity prices', new Date());
+    const tomorrowsPrices =
+      await this.electricityService.getElectricityPrices(1);
+
+    const priceTexts: string[] = tomorrowsPrices.map((item: ElectricityPrice) =>
+      formatCurrentPriceTelegramMessasge(item),
+    );
+    const text = concatArrayString(priceTexts);
+
+    const lowest =
+      this.electricityService.getLowsetElectricityPrice(tomorrowsPrices);
+    const highest =
+      this.electricityService.getHighestElectricityPrice(tomorrowsPrices);
+    const message = formatTodaysPriceMessage(text, highest.price, lowest.price);
+    return this.telegram.sendMessage(message);
   }
 
   @Cron('1 15 * * *')
   async getTomorrowEPrices() {
-    this.logger.debug('Fetch new price of the electricity', new Date());
+    this.logger.log('Fetching tomorrows electricity prices', new Date());
     const tomorrowsPrices =
       await this.electricityService.getElectricityPrices(2);
 
-    const text = tomorrowsPrices
-      .map(
-        (item: any) =>
-          `Klo ${format(item.from, 'HH:mm')} - ${item.price} Snt/kwh \n`,
-      )
-      .join(',')
-      .replaceAll(',', '');
+    const priceTexts: string[] = tomorrowsPrices.map((item: ElectricityPrice) =>
+      formatCurrentPriceTelegramMessasge(item),
+    );
+    const text = concatArrayString(priceTexts);
 
-    const sortedPrices = tomorrowsPrices.sort((a, b) => {
-      return a.price - b.price;
-    });
-    const lowest = sortedPrices.shift();
-    const highest = sortedPrices.pop();
+    const lowest =
+      this.electricityService.getLowsetElectricityPrice(tomorrowsPrices);
+    const highest =
+      this.electricityService.getHighestElectricityPrice(tomorrowsPrices);
+    const message = formatTomorrowsPriceMessage(
+      text,
+      highest.price,
+      lowest.price,
+    );
 
-    const t1 = `
-Tomorrows info! ⚡
-  highest: ${highest.price}
-  lowest: ${lowest.price}
-${text}
-      `;
-    await this.telegram.sendMessage(t1);
-    return;
+    return this.telegram.sendMessage(message);
   }
 }
 

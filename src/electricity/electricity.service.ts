@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { addHours, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ElectricityPrice } from './electricity.dto';
 import { PorssiSahkoIntegration } from './integration/porssisahko.integration';
 
@@ -25,5 +25,20 @@ export class ElectricityService {
       mode || 1, // 0 yesterday, 1 today, 2 tomorrow
     );
     return prices;
+  }
+
+  getHighestElectricityPrice(prices: ElectricityPrice[]): ElectricityPrice {
+    const sortedPrices = prices.sort((a, b) => {
+      return a.price - b.price;
+    });
+    const highest = sortedPrices.pop();
+    return highest;
+  }
+
+  getLowsetElectricityPrice(prices: ElectricityPrice[]): ElectricityPrice {
+    const sortedPrices = prices.sort((a, b) => {
+      return a.price - b.price;
+    });
+    return sortedPrices.shift();
   }
 }

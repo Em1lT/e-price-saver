@@ -4,6 +4,8 @@ import { TasksService } from './tasks/task.service';
 import { ConfigModule } from '@nestjs/config';
 import { TelegramModule } from 'nestjs-telegram';
 import { TelegramMessageService } from './telegram/telegram.service';
+import { ElectricityService } from './electricity/electricity.service';
+import { PorssiSahkoIntegration } from './electricity/integration/porssisahko.integration';
 
 @Module({
   imports: [
@@ -14,6 +16,11 @@ import { TelegramMessageService } from './telegram/telegram.service';
     }),
   ],
   controllers: [],
-  providers: [TasksService, TelegramMessageService],
+  providers: [
+    TasksService,
+    TelegramMessageService,
+    ElectricityService,
+    PorssiSahkoIntegration,
+  ],
 })
 export class AppModule {}
