@@ -1,121 +1,82 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import axios from 'axios';
-import { format, addHours } from 'date-fns';
-import { TelegramService } from 'nestjs-telegram';
-
-interface PriceObject {
-  time: string;
-  value: number;
-}
+import { format } from 'date-fns';
+import { ElectricityPrice } from '../electricity/electricity.dto';
+import { ElectricityService } from '../electricity/electricity.service';
+import { TelegramMessageService } from '../telegram/telegram.service';
+import {
+  formatCurrentPriceTelegramMessasge,
+  formatTomorrowsPriceMessage,
+  formatTodaysPriceMessage,
+  concatArrayString,
+} from '../telegram/utils/helper';
 
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
-  constructor(private readonly telegram: TelegramService) {}
+  constructor(
+    private readonly telegram: TelegramMessageService,
+    private readonly electricityService: ElectricityService,
+  ) {}
 
-  @Cron('1 7-21 * * *')
-  async saveElectricityPrice() {
-    this.logger.debug('Fetch new price of the electricity', new Date());
-    const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=1`;
-    const response = await axios.get(URL);
-    const data = response.data;
-    const currentHour = format(Date.now(), 'H');
-
-    const price = data.find(
-      (price: PriceObject) => format(price.time, 'H') === currentHour,
+  // @Cron('1 7-21 * * *')
+  @Cron('* * * * *')
+  async getHourlyElectricityPrices() {
+    const priceObject = await this.electricityService.getElectricityPrice(
+      format(Date.now(), 'H'),
     );
-    const dateTime = new Date(price.time);
+    if (priceObject.price < +process.env.PRICE_TOP) {
+      this.logger.log(
+        `Price is now ${priceObject.price} but not over the notification limit ${process.env.PRICE_TOP}`,
+      );
+      return;
+    }
 
-    const priceObject = {
-      price: price.value,
-      from: dateTime.toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-      to: new Date(addHours(dateTime, 1)).toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-    };
+    const formattedText = formatCurrentPriceTelegramMessasge(priceObject);
+    return this.telegram.sendMessage(formattedText);
+  }
 
-    // const alreadySet = await this.prisma.price.findFirst({
-    //   where: {
-    //     price: priceObject.price,
-    //     AND: [
-    //       {
-    //         to: { gte: new Date().toISOString() },
-    //       },
-    //     ],
-    //   },
-    // });
+  @Cron('1 6 * * *')
+  async getTodaysElectricityPrices() {
+    this.logger.log('Fetching todays electricity prices', new Date());
+    const tomorrowsPrices =
+      await this.electricityService.getElectricityPrices(1);
 
-    // if (alreadySet) {
-    //   this.logger.log('Already set this price', alreadySet);
-    //   await this.telegram
-    //     .sendMessage({
-    //       chat_id: process.env.TELEGRAM_CHAT_ID,
-    //       text: `Hinta nyt: ${alreadySet.price} €`,
-    //     })
-    //     .toPromise();
-    //   return;
-    // }
+    const priceTexts: string[] = tomorrowsPrices.map((item: ElectricityPrice) =>
+      formatCurrentPriceTelegramMessasge(item),
+    );
+    const text = concatArrayString(priceTexts);
 
-    // this.logger.log('Saving new price of the electricity', priceObject);
-    // await this.prisma.price.create({
-    //   data: priceObject,
-    // });
-    await this.telegram
-      .sendMessage({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: `Hinta nyt: ${priceObject.price} Snt/kwh`,
-      })
-      .toPromise();
-    return;
+    const lowest =
+      this.electricityService.getLowsetElectricityPrice(tomorrowsPrices);
+    const highest =
+      this.electricityService.getHighestElectricityPrice(tomorrowsPrices);
+    const message = formatTodaysPriceMessage(text, highest.price, lowest.price);
+    return this.telegram.sendMessage(message);
   }
 
   @Cron('1 15 * * *')
   async getTomorrowEPrices() {
-    this.logger.debug('Fetch new price of the electricity', new Date());
-    const URL = `${process.env.ELECTRICITY_PRICE_URL}/api/Prices/GetPrices?mode=2`;
-    const response = await axios.get(URL);
-    const data = response.data;
+    this.logger.log('Fetching tomorrows electricity prices', new Date());
+    const tomorrowsPrices =
+      await this.electricityService.getElectricityPrices(2);
 
-    if (data.length < 5) {
-      this.logger.debug('Prices not yet updated', new Date());
-    }
+    const priceTexts: string[] = tomorrowsPrices.map((item: ElectricityPrice) =>
+      formatCurrentPriceTelegramMessasge(item),
+    );
+    const text = concatArrayString(priceTexts);
 
-    const tomorrowPrices = data.map((item: PriceObject) => {
-      const dateTime = new Date(item.time);
-      return {
-        price: item.value,
-        from: dateTime.toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-        to: new Date(addHours(dateTime, 1)).toISOString(), // new Date(new Date().setHours(fromHour)).toISOString(),
-      };
-    });
+    const lowest =
+      this.electricityService.getLowsetElectricityPrice(tomorrowsPrices);
+    const highest =
+      this.electricityService.getHighestElectricityPrice(tomorrowsPrices);
+    const message = formatTomorrowsPriceMessage(
+      text,
+      highest.price,
+      lowest.price,
+    );
 
-    const text = tomorrowPrices
-      .map(
-        (item: any) =>
-          `Klo ${format(item.from, 'HH:mm')} - ${item.price} Snt/kwh \n`,
-      )
-      .join(',')
-      .replaceAll(',', '');
-
-    const sortedPrices = tomorrowPrices.sort((a, b) => {
-      return a.price - b.price;
-    });
-    const lowest = sortedPrices.shift();
-    const highest = sortedPrices.pop();
-
-    const t1 = `
-Tomorrows info! ⚡
-  highest: ${highest.price}
-  lowest: ${lowest.price}
-${text}
-      `;
-    await this.telegram
-      .sendMessage({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: t1,
-      })
-      .toPromise();
-
-    return;
+    return this.telegram.sendMessage(message);
   }
 }
 
