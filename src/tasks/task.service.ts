@@ -19,8 +19,7 @@ export class TasksService {
     private readonly electricityService: ElectricityService,
   ) {}
 
-  // @Cron('1 7-21 * * *')
-  @Cron('* * * * *')
+  @Cron('1 7-21 * * *')
   async getHourlyElectricityPrices() {
     const priceObject = await this.electricityService.getElectricityPrice(
       format(Date.now(), 'H'),
