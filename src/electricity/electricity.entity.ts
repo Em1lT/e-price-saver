@@ -11,10 +11,7 @@ export default class ElectricityPrice {
   id: number;
 
   @Column()
-  price: string;
-
-  @Column()
-  path: string;
+  price: number;
 
   @Column()
   fromDate: Date;

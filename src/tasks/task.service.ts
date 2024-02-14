@@ -60,6 +60,8 @@ export class TasksService {
     const tomorrowsPrices =
       await this.electricityService.getElectricityPrices(2);
 
+    await this.electricityService.saveElectricityPrices(tomorrowsPrices);
+
     const priceTexts: string[] = tomorrowsPrices.map((item: ElectricityPrice) =>
       formatCurrentPriceTelegramMessasge(item),
     );
