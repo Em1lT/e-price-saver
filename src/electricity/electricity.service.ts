@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { format } from 'date-fns';
+import { endOfDay, format, startOfDay } from 'date-fns';
 import { Repository } from 'typeorm';
 import ElectricityPrice from './electricity.entity';
-import { ElectricityPrice as EPrice } from './electricity.dto';
 import { PorssiSahkoIntegration } from './integration/porssisahko.integration';
 
 @Injectable()
@@ -15,36 +14,75 @@ export class ElectricityService {
     private electricityRepository: Repository<ElectricityPrice>,
   ) {}
 
-  async getElectricityPrice(hour: string): Promise<EPrice> {
-    const prices = await this.porssisahkoIntegration.getElectricityPrices(1);
+  async getElectricityPrice1() {
+    const prices = await this.electricityRepository.find();
+    return prices;
+  }
+
+  async getElectricityPrice(
+    date: Date,
+    hour: string,
+  ): Promise<ElectricityPrice> {
+    const prices = await this.electricityRepository.find({
+      where: {
+        fromDate: startOfDay(date),
+        toDate: endOfDay(date),
+      },
+    });
+    console.log(prices);
+    if (prices.length === 0) {
+      this.logger.log('No Prices found');
+      return;
+    }
     const currentHour = hour;
 
     const price = prices.find(
-      (price: EPrice) => format(price.from, 'H') === currentHour,
+      (price: ElectricityPrice) => format(price.fromDate, 'H') === currentHour,
     );
     return price;
   }
 
-  async saveElectricityPrices(prices: EPrice[]) {
+  async saveElectricityPrices(prices: ElectricityPrice[]) {
     return Promise.all(
-      prices.map((item) => {
+      prices.map(async (item) => {
+        const alreadyFound = await this.electricityRepository.findOne({
+          where: {
+            fromDate: item.fromDate,
+            price: item.price,
+          },
+        });
+
+        if (alreadyFound) {
+          this.logger.log('Item already found!', JSON.stringify(item));
+          return;
+        }
         const price = new ElectricityPrice();
-        price.fromDate = item.from;
-        price.toDate = item.to;
+        price.fromDate = item.fromDate;
+        price.toDate = item.toDate;
         price.price = item.price;
-        this.electricityRepository.save(price);
+        // await this.electricityRepository.save(price);
       }),
     );
   }
 
-  async getElectricityPrices(mode: number): Promise<EPrice[]> {
-    const prices = await this.porssisahkoIntegration.getElectricityPrices(
-      mode || 1, // 0 yesterday, 1 today, 2 tomorrow
-    );
+  async getNewElectricityPrices(mode: number): Promise<ElectricityPrice[]> {
+    const prices = await this.porssisahkoIntegration.getElectricityPrices(mode);
+    await this.saveElectricityPrices(prices);
     return prices;
   }
 
-  getHighestElectricityPrice(prices: EPrice[]): EPrice {
+  async getElectricityPrices(date: Date): Promise<ElectricityPrice[]> {
+    const prices = await this.electricityRepository.find({
+      where: {
+        fromDate: startOfDay(date),
+        toDate: endOfDay(date),
+      },
+    });
+
+    return prices;
+  }
+
+  getHighestElectricityPrice(prices: ElectricityPrice[]): ElectricityPrice {
     const sortedPrices = prices.sort((a, b) => {
       return a.price - b.price;
     });
@@ -52,7 +90,7 @@ export class ElectricityService {
     return highest;
   }
 
-  getLowsetElectricityPrice(prices: EPrice[]): EPrice {
+  getLowsetElectricityPrice(prices: ElectricityPrice[]): ElectricityPrice {
     const sortedPrices = prices.sort((a, b) => {
       return a.price - b.price;
     });

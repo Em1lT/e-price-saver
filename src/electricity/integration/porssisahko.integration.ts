@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { addHours } from 'date-fns';
-import { ElectricityPrice, ElectricityPriceDto } from '../electricity.dto';
+import { ElectricityPriceDto } from '../electricity.dto';
+import ElectricityPrice from '../electricity.entity';
 
 @Injectable()
 export class PorssiSahkoIntegration {
@@ -10,12 +11,13 @@ export class PorssiSahkoIntegration {
 
   marshall(prices: ElectricityPriceDto[]): ElectricityPrice[] {
     return prices.map((item: ElectricityPriceDto): ElectricityPrice => {
-      const dateTime = new Date(item.time);
-      return {
-        price: item.value,
-        from: dateTime,
-        to: new Date(addHours(dateTime, 1)),
-      };
+      const from = new Date(item.time);
+      const to = addHours((new Date(), item.time), 1);
+      const price = new ElectricityPrice();
+      price.fromDate = from;
+      price.toDate = to;
+      price.price = item.value;
+      return price;
     });
   }
 
