@@ -18,17 +18,7 @@ export class TasksService {
     private readonly electricityService: ElectricityService,
   ) {}
 
-  @Cron('* * * * *')
-  async test() {
-    // const tomorrowsPrices =
-    //   await this.electricityService.getNewElectricityPrices(1);
-
-    // await this.electricityService.saveElectricityPrices(tomorrowsPrices);
-
-    await this.getHourlyElectricityPrices();
-  }
-
-  // @Cron('1 7-21 * * *')
+  @Cron('1 7-21 * * *')
   async getHourlyElectricityPrices() {
     const priceObject = await this.electricityService.getElectricityPrice(
       new Date(),
@@ -47,7 +37,6 @@ export class TasksService {
   @Cron('1 6 * * *')
   async getTodaysElectricityPrices() {
     this.logger.log('Fetching todays electricity prices', new Date());
-    // TODO: Error handling if there are no prices
     const todaysPrices = await this.electricityService.getElectricityPrices(
       new Date(),
     );
@@ -70,6 +59,10 @@ export class TasksService {
     this.logger.log('Fetching tomorrows electricity prices', new Date());
     const tomorrowsPrices =
       await this.electricityService.getNewElectricityPrices(2);
+
+    if (tomorrowsPrices.length < 5) {
+      throw new Error('No tomorrows prices found!');
+    }
 
     await this.electricityService.saveElectricityPrices(tomorrowsPrices);
 

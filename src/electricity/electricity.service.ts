@@ -20,12 +20,13 @@ export class ElectricityService {
   }
 
   async getElectricityPrice(date: Date): Promise<ElectricityPrice> {
-    const price = await this.electricityRepository.findOne({
-      where: {
-        fromDate: startOfHour(date),
-      },
-    });
-    if (price) {
+    const price = await this.electricityRepository
+      .createQueryBuilder()
+      .where('createdAt >= :after', { after: startOfDay(date) })
+      .andWhere('createdAt < :before', { before: endOfDay(date) })
+      .getOne();
+
+    if (!price) {
       throw new Error('No Price found');
     }
 
@@ -62,12 +63,11 @@ export class ElectricityService {
   }
 
   async getElectricityPrices(date: Date): Promise<ElectricityPrice[]> {
-    const prices = await this.electricityRepository.find({
-      where: {
-        fromDate: startOfDay(date),
-        toDate: endOfDay(date),
-      },
-    });
+    const prices = await this.electricityRepository
+      .createQueryBuilder()
+      .where('fromDate >= :after', { after: startOfDay(date) })
+      .andWhere('toDate < :before', { before: endOfDay(date) })
+      .getMany();
 
     return prices;
   }
