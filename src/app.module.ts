@@ -17,7 +17,7 @@ const migrationsDir =
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: process.env.DATABASE_URL,
-      synchronize: false,
+      synchronize: true,
       entities: [ElectricityPrice],
       logging: process.env.SQL_DEBUG === 'true' ? 'all' : ['error', 'warn'],
       migrations: process.env.RUN_MIGRATIONS

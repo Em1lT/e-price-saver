@@ -10,7 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "check-db": "sqlite3 price.db 'SELECT * FROM price;'"
+    "check-db": "sqlite3 price.db 'SELECT * FROM electricityPrice;'"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

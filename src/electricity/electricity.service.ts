@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { endOfDay, format, startOfDay } from 'date-fns';
+import { endOfDay, format, startOfDay, startOfHour } from 'date-fns';
 import { Repository } from 'typeorm';
 import ElectricityPrice from './electricity.entity';
 import { PorssiSahkoIntegration } from './integration/porssisahko.integration';
@@ -19,26 +19,16 @@ export class ElectricityService {
     return prices;
   }
 
-  async getElectricityPrice(
-    date: Date,
-    hour: string,
-  ): Promise<ElectricityPrice> {
-    const prices = await this.electricityRepository.find({
+  async getElectricityPrice(date: Date): Promise<ElectricityPrice> {
+    const price = await this.electricityRepository.findOne({
       where: {
-        fromDate: startOfDay(date),
-        toDate: endOfDay(date),
+        fromDate: startOfHour(date),
       },
     });
-    console.log(prices);
-    if (prices.length === 0) {
-      this.logger.log('No Prices found');
-      return;
+    if (price) {
+      throw new Error('No Price found');
     }
-    const currentHour = hour;
 
-    const price = prices.find(
-      (price: ElectricityPrice) => format(price.fromDate, 'H') === currentHour,
-    );
     return price;
   }
 
@@ -60,7 +50,7 @@ export class ElectricityService {
         price.fromDate = item.fromDate;
         price.toDate = item.toDate;
         price.price = item.price;
-        // await this.electricityRepository.save(price);
+        await this.electricityRepository.save(price);
       }),
     );
   }

@@ -12,7 +12,7 @@ export class PorssiSahkoIntegration {
   marshall(prices: ElectricityPriceDto[]): ElectricityPrice[] {
     return prices.map((item: ElectricityPriceDto): ElectricityPrice => {
       const from = new Date(item.time);
-      const to = addHours((new Date(), item.time), 1);
+      const to = addHours(item.time, 1);
       const price = new ElectricityPrice();
       price.fromDate = from;
       price.toDate = to;
