@@ -1,10 +1,10 @@
 import { format } from 'date-fns';
-import { ElectricityPrice } from '../../electricity/electricity.dto';
+import ElectricityPrice from '../../electricity/electricity.entity';
 
 export const formatCurrentPriceTelegramMessasge = (
   price: ElectricityPrice,
 ): string => {
-  return `Klo ${format(price.from, 'HH:mm')} - ${price.price} Snt/kwh \n`;
+  return `Klo ${format(price.fromDate, 'HH:mm')} - ${price.price} Snt/kwh \n`;
 };
 
 export const concatArrayString = (text: string[]): string => {
