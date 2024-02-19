@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { format } from 'date-fns';
-import { ElectricityPrice } from './electricity.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { endOfDay, format, startOfDay, startOfHour } from 'date-fns';
+import { Repository } from 'typeorm';
+import ElectricityPrice from './electricity.entity';
 import { PorssiSahkoIntegration } from './integration/porssisahko.integration';
 
 @Injectable()
@@ -8,22 +10,65 @@ export class ElectricityService {
   private readonly logger = new Logger(ElectricityService.name);
   constructor(
     private readonly porssisahkoIntegration: PorssiSahkoIntegration,
+    @InjectRepository(ElectricityPrice)
+    private electricityRepository: Repository<ElectricityPrice>,
   ) {}
 
-  async getElectricityPrice(hour: string): Promise<ElectricityPrice> {
-    const prices = await this.porssisahkoIntegration.getElectricityPrices(1);
-    const currentHour = hour;
+  async getElectricityPrice1() {
+    const prices = await this.electricityRepository.find();
+    return prices;
+  }
 
-    const price = prices.find(
-      (price: ElectricityPrice) => format(price.from, 'H') === currentHour,
-    );
+  async getElectricityPrice(date: Date): Promise<ElectricityPrice> {
+    const price = await this.electricityRepository
+      .createQueryBuilder()
+      .where('createdAt >= :after', { after: startOfDay(date) })
+      .andWhere('createdAt < :before', { before: endOfDay(date) })
+      .getOne();
+
+    if (!price) {
+      throw new Error('No Price found');
+    }
+
     return price;
   }
 
-  async getElectricityPrices(mode: number): Promise<ElectricityPrice[]> {
-    const prices = await this.porssisahkoIntegration.getElectricityPrices(
-      mode || 1, // 0 yesterday, 1 today, 2 tomorrow
+  async saveElectricityPrices(prices: ElectricityPrice[]) {
+    return Promise.all(
+      prices.map(async (item) => {
+        const alreadyFound = await this.electricityRepository.findOne({
+          where: {
+            fromDate: item.fromDate,
+            price: item.price,
+          },
+        });
+
+        if (alreadyFound) {
+          this.logger.log('Item already found!', JSON.stringify(item));
+          return;
+        }
+        const price = new ElectricityPrice();
+        price.fromDate = item.fromDate;
+        price.toDate = item.toDate;
+        price.price = item.price;
+        await this.electricityRepository.save(price);
+      }),
     );
+  }
+
+  async getNewElectricityPrices(mode: number): Promise<ElectricityPrice[]> {
+    const prices = await this.porssisahkoIntegration.getElectricityPrices(mode);
+    await this.saveElectricityPrices(prices);
+    return prices;
+  }
+
+  async getElectricityPrices(date: Date): Promise<ElectricityPrice[]> {
+    const prices = await this.electricityRepository
+      .createQueryBuilder()
+      .where('fromDate >= :after', { after: startOfDay(date) })
+      .andWhere('toDate < :before', { before: endOfDay(date) })
+      .getMany();
+
     return prices;
   }
 
