@@ -1,5 +1,0 @@
--- CreateTable
-CREATE TABLE "Price" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "price" INTEGER NOT NULL
-);

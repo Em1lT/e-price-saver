@@ -1,26 +1,32 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { TasksService } from './tasks/task.service';
 import { ConfigModule } from '@nestjs/config';
-import { TelegramModule } from 'nestjs-telegram';
-import { TelegramMessageService } from './telegram/telegram.service';
-import { ElectricityService } from './electricity/electricity.service';
-import { PorssiSahkoIntegration } from './electricity/integration/porssisahko.integration';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import ElectricityPrice from './electricity/electricity.entity';
+import { ElectricityModule } from './electricity/electricity.module';
+
+const migrationsDir =
+  process.env.NODE_ENV === 'production' ? 'migrations-prod' : 'migrations-dev';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
-    ScheduleModule.forRoot(),
-    TelegramModule.forRoot({
-      botKey: process.env.TELEGRAM_API_KEY,
+    ConfigModule.forRoot({
+      isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
+    TypeOrmModule.forRoot({
+      type: 'sqlite',
+      database: process.env.DATABASE_URL,
+      synchronize: true,
+      entities: [ElectricityPrice],
+      logging: process.env.SQL_DEBUG === 'true' ? 'all' : ['error', 'warn'],
+      migrations: process.env.RUN_MIGRATIONS
+        ? [`${migrationsDir}/*{.ts,.js}`]
+        : [],
+    }),
+    ElectricityModule,
   ],
   controllers: [],
-  providers: [
-    TasksService,
-    TelegramMessageService,
-    ElectricityService,
-    PorssiSahkoIntegration,
-  ],
+  providers: [],
 })
 export class AppModule {}
